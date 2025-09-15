@@ -1,7 +1,5 @@
 // netlify/functions/restore.js
-import fetch from "node-fetch";
-
-export const handler = async () => {
+exports.handler = async () => {
   const token = process.env.GITHUB_TOKEN;
   const gistId = process.env.GIST_ID;
 
@@ -17,24 +15,19 @@ export const handler = async () => {
       },
     });
     const gist = await res.json();
-    if (!res.ok) throw new Error(JSON.stringify(gist));
+    if (!res.ok) throw new Error(gist.message || JSON.stringify(gist));
 
     const file = Object.values(gist.files).find((f) =>
-      f.filename.endsWith("-backup.json")
+      (f.filename || "").endsWith("-backup.json")
     );
     if (!file) return { statusCode: 404, body: "No backup file" };
 
-    // Fetch raw file contents
     const rawRes = await fetch(file.raw_url, {
       headers: { Authorization: `token ${token}` },
     });
     const text = await rawRes.text();
 
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: text,
-    };
+    return { statusCode: 200, headers: { "Content-Type": "application/json" }, body: text };
   } catch (e) {
     return { statusCode: 500, body: `Restore failed: ${e.message}` };
   }

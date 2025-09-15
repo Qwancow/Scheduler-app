@@ -1,12 +1,11 @@
 // netlify/functions/backup.js
-import fetch from "node-fetch";
-
-export const handler = async (event) => {
+exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
+
   const token = process.env.GITHUB_TOKEN; // set in Netlify env
-  const gistId = process.env.GIST_ID || ""; // optional: if blank, we’ll create
+  const gistId = process.env.GIST_ID || ""; // leave blank first run
 
   if (!token) {
     return { statusCode: 500, body: "Missing GITHUB_TOKEN" };
@@ -18,11 +17,7 @@ export const handler = async (event) => {
 
     const files = {
       [`${site}-backup.json`]: {
-        content: JSON.stringify(
-          { site, when, data },
-          null,
-          2
-        ),
+        content: JSON.stringify({ site, when, data }, null, 2),
       },
     };
 
@@ -42,11 +37,8 @@ export const handler = async (event) => {
         }),
       });
       const created = await res.json();
-      if (!res.ok) throw new Error(JSON.stringify(created));
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ ok: true, gistId: created.id }),
-      };
+      if (!res.ok) throw new Error(created.message || JSON.stringify(created));
+      return { statusCode: 200, body: JSON.stringify({ ok: true, gistId: created.id }) };
     } else {
       // Update existing gist
       const res = await fetch(`https://api.github.com/gists/${gistId}`, {
@@ -59,10 +51,11 @@ export const handler = async (event) => {
         body: JSON.stringify({ files }),
       });
       const updated = await res.json();
-      if (!res.ok) throw new Error(JSON.stringify(updated));
+      if (!res.ok) throw new Error(updated.message || JSON.stringify(updated));
       return { statusCode: 200, body: JSON.stringify({ ok: true }) };
     }
   } catch (e) {
     return { statusCode: 500, body: `Backup failed: ${e.message}` };
   }
 };
+
