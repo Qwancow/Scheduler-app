@@ -1,3 +1,4 @@
+
 import React, { useEffect, useMemo, useState } from "react";
 
 /* =========================
@@ -20,7 +21,7 @@ const downloadBlob = (url, filename) => {
   a.remove();
   URL.revokeObjectURL(url);
 };
-const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+const slug = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 /* =========================
    Sex helpers
@@ -55,17 +56,15 @@ export default function App() {
   };
   const DEFAULT_WORKERS = ["Alex", "Bailey", "Casey"];
 
-  const [appointments, setAppointments] = useState([]);              // active (non-archived)
-  const [archivedAppointments, setArchivedAppointments] = useState([]); // archived/past
-
+  const [appointments, setAppointments] = useState([]);              // active
+  const [archivedAppointments, setArchivedAppointments] = useState([]); // archived
   const [doctors, setDoctors] = useState(DEFAULT_DOCTORS);
   const [doctorByDate, setDoctorByDate] = useState({});
   const [workers, setWorkers] = useState(DEFAULT_WORKERS);
   const [staffByDate, setStaffByDate] = useState({});
-
   const [lastBackupAt, setLastBackupAt] = useState(() => localStorage.getItem("lastBackupAt") || "");
 
-  /* ---------- Entry form state ---------- */
+  /* ---------- Entry form ---------- */
   const emptyCat = { name: "", age: "", color: "", breed: "", sex: "" };
   const [clientName, setClientName] = useState("");
   const [address, setAddress] = useState("");
@@ -88,23 +87,22 @@ export default function App() {
   const [servicesNotes, setServicesNotes] = useState("");
   const [editingId, setEditingId] = useState(null);
 
-  /* ---------- UI state ---------- */
+  /* ---------- UI ---------- */
   const [searchText, setSearchText] = useState("");
   const [showDoctorSettings, setShowDoctorSettings] = useState(false);
   const [showWorkerSettings, setShowWorkerSettings] = useState(false);
   const [printDate, setPrintDate] = useState("");
   const [printModeDate, setPrintModeDate] = useState("");
   const [selected, setSelected] = useState(null);
-  const [calMonth, setCalMonth] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
-  });
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [collapsedDates, setCollapsedDates] = useState({});
   const [showArchived, setShowArchived] = useState(false);
   const [compactCards, setCompactCards] = useState(true);
 
-  /* ---------- Doctor/Worker assignment state (light) ---------- */
+  // quick info card when clicking a date
+  const [selectedDayInfo, setSelectedDayInfo] = useState("");
+
+  /* ---------- Doctor/Worker assignment state ---------- */
   const [docName, setDocName] = useState("");
   const [docColor, setDocColor] = useState("#10b981");
   const [doctorDate, setDoctorDate] = useState("");
@@ -113,7 +111,6 @@ export default function App() {
   const [workerName, setWorkerName] = useState("");
   const [staffDate, setStaffDate] = useState("");
   const [selectedWorkerId, setSelectedWorkerId] = useState("");
-  const workerOptions = workers.map((w) => ({ id: slug(w) || w, name: w }));
 
   /* =========================
      Load from localStorage
@@ -137,7 +134,6 @@ export default function App() {
 
   /* =========================
      Persist (local only)
-     (Manual-only cloud backup; nothing auto here)
   ========================= */
   useEffect(() => {
     localStorage.setItem("appointments", JSON.stringify(appointments));
@@ -162,12 +158,11 @@ export default function App() {
     setServicesNotes("");
     setEditingId(null);
   };
-  const toggleService = (name) =>
-    setSelectedServices((prev) => {
-      const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
-      return next;
-    });
+  const toggleService = (name) => setSelectedServices((prev) => {
+    const next = new Set(prev);
+    next.has(name) ? next.delete(name) : next.add(name);
+    return next;
+  });
   const addCatRow = () => setCats((prev) => [...prev, { ...emptyCat }]);
   const removeCatRow = (i) => setCats((prev) => prev.filter((_, idx) => idx !== i));
   const updateCatField = (i, k, v) => setCats((prev) => prev.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)));
@@ -179,11 +174,7 @@ export default function App() {
     }
     const updated = {
       id: editingId ?? Date.now(),
-      clientName,
-      address,
-      phone,
-      email,
-      date,
+      clientName, address, phone, email, date,
       cats: cats
         .map((c) => ({ ...c, sex: normSex(c.sex) }))
         .filter((c) => c.name || c.age || c.color || c.breed || c.sex),
@@ -217,6 +208,74 @@ export default function App() {
     if (selected?.id === id) setSelected(null);
   };
 
+  /* ===== Doctor helpers ===== */
+  function addDoctor() {
+    const name = (docName || "").trim();
+    if (!name) return alert("Doctor name required.");
+    const key = slug(name) || `doc-${Date.now()}`;
+    setDoctors((prev) => ({ ...prev, [key]: { name, color: docColor || "#10b981" } }));
+    setDocName("");
+  }
+  function removeDoctor(key) {
+    if (!window.confirm("Remove this doctor? This also clears any date assignments.")) return;
+    setDoctors((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+    setDoctorByDate((prev) => {
+      const next = { ...prev };
+      for (const d in next) if (next[d] === key) delete next[d];
+      return next;
+    });
+  }
+  function assignDoctorToDate() {
+    if (!doctorDate) return alert("Pick a date.");
+    if (!doctorKey) return alert("Choose a doctor.");
+    setDoctorByDate((prev) => ({ ...prev, [doctorDate]: doctorKey }));
+  }
+  function clearDoctorForDate() {
+    if (!doctorDate) return;
+    setDoctorByDate((prev) => {
+      const next = { ...prev };
+      delete next[doctorDate];
+      return next;
+    });
+  }
+
+  /* ===== Worker helpers ===== */
+  function addWorker() {
+    const name = (workerName || "").trim();
+    if (!name) return alert("Worker name required.");
+    setWorkers((prev) => Array.from(new Set([...prev, name])));
+    setWorkerName("");
+  }
+  function removeWorker(name) {
+    if (!window.confirm("Remove this worker from the list and all dates?")) return;
+    setWorkers((prev) => prev.filter((w) => w !== name));
+    setStaffByDate((prev) => {
+      const out = { ...prev };
+      for (const d in out) out[d] = (out[d] || []).filter((w) => w !== name);
+      return out;
+    });
+  }
+  function assignWorkerToDate() {
+    if (!staffDate) return alert("Pick a date.");
+    if (!selectedWorkerId) return alert("Choose a worker.");
+    const worker = workers.find((w) => slug(w) === selectedWorkerId) || selectedWorkerId;
+    setStaffByDate((prev) => {
+      const set = new Set([...(prev[staffDate] || []), worker]);
+      return { ...prev, [staffDate]: Array.from(set) };
+    });
+  }
+  function removeWorkerFromSelectedDate(name) {
+    if (!staffDate) return;
+    setStaffByDate((prev) => {
+      const arr = (prev[staffDate] || []).filter((w) => w !== name);
+      return { ...prev, [staffDate]: arr };
+    });
+  }
+
   /* =========================
      Search & group (ACTIVE)
   ========================= */
@@ -230,9 +289,7 @@ export default function App() {
 
   const groupedActiveByDate = useMemo(() => {
     const map = {};
-    for (const a of filteredActive) {
-      (map[a.date] ||= []).push(a);
-    }
+    for (const a of filteredActive) (map[a.date] ||= []).push(a);
     return map;
   }, [filteredActive]);
 
@@ -241,7 +298,7 @@ export default function App() {
   ========================= */
   const sexCountsByDate = useMemo(() => {
     const m = {};
-    const all = [...appointments, ...archivedAppointments]; // counts across everything
+    const all = [...appointments, ...archivedAppointments]; // include archived for counts
     for (const a of all) {
       const dd = a.date;
       if (!m[dd]) m[dd] = { male: 0, female: 0, unknown: 0 };
@@ -284,7 +341,6 @@ export default function App() {
     setArchivedAppointments((prev) => [...prev, ...gone].sort((x, y) => x.date.localeCompare(y.date)));
     alert(`Archived ${gone.length} appointment(s).`);
   };
-
   const unarchiveAll = () => {
     if (!window.confirm("Restore ALL archived appointments to active list?")) return;
     setAppointments((prev) => [...prev, ...archivedAppointments].sort((x, y) => x.date.localeCompare(y.date)));
@@ -296,20 +352,9 @@ export default function App() {
   ========================= */
   const toCsv = (appts) => {
     const headers = [
-      "Date",
-      "Client Name",
-      "Address",
-      "Phone",
-      "Email",
-      "Cat Name",
-      "Cat Age",
-      "Cat Color",
-      "Cat Breed",
-      "Cat Sex",
-      "Selected Services",
-      "Services Notes",
-      "Appointment ID",
-      "Archived",
+      "Date","Client Name","Address","Phone","Email",
+      "Cat Name","Cat Age","Cat Color","Cat Breed","Cat Sex",
+      "Selected Services","Services Notes","Appointment ID","Archived",
     ];
     const rows = [headers.join(",")];
     for (const a of appts) {
@@ -319,37 +364,23 @@ export default function App() {
       const isArch = archivedAppointments.some((x) => x.id === a.id) ? "Yes" : "No";
       if (Array.isArray(a.cats) && a.cats.length) {
         for (const c of a.cats) {
-          rows.push(
-            [
-              ...base.map(csvEscape),
-              csvEscape(c.name || ""),
-              csvEscape(c.age || ""),
-              csvEscape(c.color || ""),
-              csvEscape(c.breed || ""),
-              csvEscape(normSex(c.sex) || ""),
-              csvEscape(services),
-              csvEscape(notes),
-              csvEscape(a.id),
-              csvEscape(isArch),
-            ].join(",")
-          );
+          rows.push([
+            ...base.map(csvEscape),
+            csvEscape(c.name || ""), csvEscape(c.age || ""), csvEscape(c.color || ""),
+            csvEscape(c.breed || ""), csvEscape(normSex(c.sex) || ""),
+            csvEscape(services), csvEscape(notes), csvEscape(a.id), csvEscape(isArch),
+          ].join(","));
         }
       } else {
-        rows.push(
-          [
-            ...base.map(csvEscape),
-            "", "", "", "", "",
-            csvEscape(services),
-            csvEscape(notes),
-            csvEscape(a.id),
-            csvEscape(isArch),
-          ].join(",")
-        );
+        rows.push([
+          ...base.map(csvEscape),
+          "", "", "", "", "",
+          csvEscape(services), csvEscape(notes), csvEscape(a.id), csvEscape(isArch),
+        ].join(","));
       }
     }
     return rows.join("\n");
   };
-
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(appointments, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -372,13 +403,8 @@ export default function App() {
       let added = 0, replaced = 0;
       for (const a of data) {
         if (!a || typeof a !== "object") continue;
-        if (byId.has(a.id)) {
-          byId.set(a.id, a);
-          replaced++;
-        } else {
-          byId.set(a.id, a);
-          added++;
-        }
+        if (byId.has(a.id)) { byId.set(a.id, a); replaced++; }
+        else { byId.set(a.id, a); added++; }
       }
       const merged = Array.from(byId.values()).sort((x, y) => x.date.localeCompare(y.date));
       setAppointments(merged);
@@ -396,15 +422,12 @@ export default function App() {
   async function backupNow() {
     try {
       const payload = { appointments, archivedAppointments, doctors, doctorByDate, workers, staffByDate };
-
-      // Prevent accidental empty overwrite
       const isEmpty =
         (!payload.appointments?.length && !payload.archivedAppointments?.length) &&
         (!Object.keys(payload.doctors || {}).length) &&
         (!Object.keys(payload.doctorByDate || {}).length) &&
         (!payload.workers?.length) &&
         (!Object.keys(payload.staffByDate || {}).length);
-
       if (isEmpty && !window.confirm("Data looks empty. Overwrite cloud backup with an empty snapshot?")) return;
 
       const ts = new Date().toISOString();
@@ -422,25 +445,20 @@ export default function App() {
       alert("❌ Backup failed. Check your internet or Netlify logs.");
     }
   }
-
   async function restoreFromCloud() {
     try {
       const res = await fetch("/.netlify/functions/restore");
       if (!res.ok) return alert("No cloud backup found or restore function not configured.");
-      const json = await res.json(); // { site, when, data }
+      const json = await res.json();
       if (!json?.data) return alert("Backup file empty.");
-
       if (!window.confirm(`Restore data from ${json.when}?\nThis will overwrite current data on this device.`)) return;
-
       const { appointments: A = [], archivedAppointments: AA = [], doctors: D, doctorByDate: DB, workers: W, staffByDate: SB } = json.data;
-
       setAppointments(Array.isArray(A) ? A : []);
       setArchivedAppointments(Array.isArray(AA) ? AA : []);
       if (D) setDoctors(D);
       if (DB) setDoctorByDate(DB);
       if (W) setWorkers(W);
       if (SB) setStaffByDate(SB);
-
       alert("✅ Restore complete.");
     } catch (e) {
       console.error(e);
@@ -490,7 +508,7 @@ export default function App() {
   for (let d = 1; d <= lastDay; d++) days.push(new Date(calMonth.getFullYear(), calMonth.getMonth(), d));
 
   /* =========================
-     Print view (unchanged)
+     Print view
   ========================= */
   const apptsForDate = (d) => appointments.filter((a) => a.date === d);
   const printDay = () => { if (printDate) setPrintModeDate(printDate); };
@@ -562,15 +580,11 @@ export default function App() {
             Import JSON
             <input type="file" accept="application/json" onChange={onImportFile} style={{ display: "none" }} />
           </label>
-
-          {/* Cloud controls (manual only) */}
           <button style={buttonSecondary} onClick={backupNow}>Cloud Backup now</button>
           <button style={buttonLight} onClick={restoreFromCloud}>Restore from Cloud</button>
           <span style={{ color: "#6b7280", fontSize: 13 }}>
             Last cloud backup: {lastBackupAt ? new Date(lastBackupAt).toLocaleString() : "never"}
           </span>
-
-          {/* View options */}
           <label style={{ color:"#6b7280", fontSize:13 }}>
             <input type="checkbox" checked={compactCards} onChange={(e)=>setCompactCards(e.target.checked)} style={{ marginRight: 6 }} />
             Compact cards
@@ -585,10 +599,129 @@ export default function App() {
           <button style={buttonLight} onClick={() => setShowArchived((v) => !v)}>{showArchived ? "Hide" : "Show"} archived</button>
           {archivedAppointments.length > 0 && <button style={buttonLight} onClick={unarchiveAll}>Restore ALL archived</button>}
         </div>
-        <div style={{ color: "#6b7280", fontSize: 13 }}>
-          Archived count: <b>{archivedAppointments.length}</b>
-        </div>
+        <div style={{ color: "#6b7280", fontSize: 13 }}>Archived count: <b>{archivedAppointments.length}</b></div>
       </div>
+
+      {/* Doctors Settings */}
+      <div style={card}>
+        <button
+          style={{ ...buttonLight, width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          onClick={() => setShowDoctorSettings((v) => !v)}
+        >
+          <span>🩺 Doctors Settings</span>
+          <span>{showDoctorSettings ? "▲" : "▼"}</span>
+        </button>
+        {showDoctorSettings && (
+          <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "2fr 1fr auto" }}>
+              <input style={input} placeholder="Doctor name (e.g., Dr. Smith)" value={docName} onChange={(e) => setDocName(e.target.value)} />
+              <input style={input} type="color" value={docColor} onChange={(e) => setDocColor(e.target.value)} title="Color tag" />
+              <button style={buttonLight} onClick={addDoctor}>Add Doctor</button>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {Object.entries(doctors).map(([key, d]) => (
+                <div key={key} style={{ ...tag, background: d.color, color: "#fff" }}>
+                  {d.name}
+                  <button onClick={() => removeDoctor(key)} style={{ marginLeft: 8, background: "#00000022", color: "#fff", border: "none", borderRadius: 6, padding: "0 6px", cursor: "pointer" }} title="Remove doctor">×</button>
+                </div>
+              ))}
+              {!Object.keys(doctors).length && <span style={{ color: "#6b7280" }}>No doctors yet.</span>}
+            </div>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr auto auto" }}>
+              <input style={input} type="date" value={doctorDate} onChange={(e) => setDoctorDate(e.target.value)} />
+              <select style={input} value={doctorKey} onChange={(e) => setDoctorKey(e.target.value)}>
+                <option value="">Choose doctor…</option>
+                {Object.entries(doctors).map(([key, d]) => (<option key={key} value={key}>{d.name}</option>))}
+              </select>
+              <button style={buttonLight} onClick={assignDoctorToDate}>Set for date</button>
+              <button style={buttonLight} onClick={clearDoctorForDate}>Clear date</button>
+            </div>
+            {!!doctorDate && (
+              <div style={{ color: "#6b7280" }}>
+                Selected date <b>{doctorDate}</b> → {doctorByDate[doctorDate] ? `Doctor: ${doctors[doctorByDate[doctorDate]]?.name || doctorByDate[doctorDate]}` : "No doctor assigned"}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Workers Settings */}
+      <div style={card}>
+        <button
+          style={{ ...buttonLight, width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+          onClick={() => setShowWorkerSettings((v) => !v)}
+        >
+          <span>🧑‍⚕️ Workers Settings</span>
+          <span>{showWorkerSettings ? "▲" : "▼"}</span>
+        </button>
+        {showWorkerSettings && (
+          <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "2fr auto" }}>
+              <input style={input} placeholder="Worker name (e.g., Alex)" value={workerName} onChange={(e) => setWorkerName(e.target.value)} />
+              <button style={buttonLight} onClick={addWorker}>Add Worker</button>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {workers.map((w) => (
+                <div key={w} style={{ ...tag, background: "#f3f4f6", color: "#374151" }}>
+                  {w}
+                  <button onClick={() => removeWorker(w)} style={{ marginLeft: 8, background: "#00000011", border: "none", borderRadius: 6, padding: "0 6px", cursor: "pointer" }} title="Remove worker">×</button>
+                </div>
+              ))}
+              {!workers.length && <span style={{ color: "#6b7280" }}>No workers yet.</span>}
+            </div>
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr auto" }}>
+              <input style={input} type="date" value={staffDate} onChange={(e) => setStaffDate(e.target.value)} />
+              <select style={input} value={selectedWorkerId} onChange={(e) => setSelectedWorkerId(e.target.value)}>
+                <option value="">Choose worker…</option>
+                {workers.map((w) => (<option key={w} value={slug(w)}>{w}</option>))}
+              </select>
+              <button style={buttonLight} onClick={assignWorkerToDate}>Add to day</button>
+            </div>
+            {!!staffDate && (
+              <div>
+                <div style={{ marginBottom: 6, color: "#6b7280" }}>Workers on <b>{staffDate}</b>:</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {(staffByDate[staffDate] || []).map((w) => (
+                    <span key={w} style={{ ...tag, background: "#e5e7eb", color: "#111827" }}>
+                      {w}
+                      <button onClick={() => removeWorkerFromSelectedDate(w)} style={{ marginLeft: 6, border: "none", background: "transparent", cursor: "pointer" }} title="Remove from date">×</button>
+                    </span>
+                  ))}
+                  {!(staffByDate[staffDate] || []).length && <span style={{ color: "#6b7280" }}>No workers assigned to this date.</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Day Overview (click a date) */}
+      {selectedDayInfo && (
+        <div style={{ ...card, borderLeft: "4px solid #2563eb" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={{ margin: 0 }}>Day overview — {selectedDayInfo}</h3>
+            <button style={buttonLight} onClick={() => setSelectedDayInfo("")}>Close</button>
+          </div>
+          <div style={{ marginTop: 8, color: "#374151" }}>
+            <div>
+              Doctor:{" "}
+              {doctorByDate[selectedDayInfo]
+                ? (doctors[doctorByDate[selectedDayInfo]]?.name || doctorByDate[selectedDayInfo])
+                : "—"}
+            </div>
+            <div>Workers: {(staffByDate[selectedDayInfo] || []).join(", ") || "—"}</div>
+            {(() => {
+              const c = sexCountsByDate[selectedDayInfo] || { male: 0, female: 0, unknown: 0 };
+              const total = totalCatsByDate[selectedDayInfo] || 0;
+              return (
+                <div style={{ marginTop: 6 }}>
+                  Cats — M:{c.male} F:{c.female} U:{c.unknown} • Total:{total}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Calendar */}
       <div style={card}>
@@ -609,7 +742,6 @@ export default function App() {
             const docId = doctorByDate[ymd];
             const doc = docId ? doctors[docId] : null;
             const staffCount = (staffByDate[ymd]?.length) || 0;
-
             const cellStyle = {
               border: "1px solid " + (doc ? doc.color : "#e5e7eb"),
               minHeight: 120,
@@ -625,9 +757,11 @@ export default function App() {
             return (
               <div key={idx} style={cellStyle} title={ymd}
                 onClick={() => {
-                  // scroll to that day in the list if it exists
+                  // show overview card
+                  setSelectedDayInfo(ymd);
+                  // jump to the list for that day and expand it
                   const el = document.getElementById(`day-${ymd}`);
-                  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); }
                   setCollapsedDates((prev)=>({ ...prev, [ymd]: false }));
                 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -653,7 +787,6 @@ export default function App() {
           <h3 style={{ margin: 0 }}>{editingId ? "Edit Appointment" : "New Appointment"}</h3>
           {editingId && <button style={buttonLight} onClick={() => resetForm()}>Cancel</button>}
         </div>
-
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "1fr 1fr" }}>
           <div>
             <label style={label}>Client Name *</label>
@@ -738,9 +871,7 @@ export default function App() {
                   {collapsed ? "▶" : "▼"}
                 </button>
                 <span>{d}</span>
-                <span style={{ marginLeft: 8, color: "#6b7280", fontSize: 13 }}>
-                  Cats — M:{c.male} F:{c.female} U:{c.unknown} • Total:{totalCats}
-                </span>
+                <span style={{ marginLeft: 8, color: "#6b7280", fontSize: 13 }}>Cats — M:{c.male} F:{c.female} U:{c.unknown} • Total:{totalCats}</span>
               </h3>
               {!collapsed && appts.map((appt) => (
                 <div key={appt.id} style={listCard}>
@@ -766,9 +897,7 @@ export default function App() {
                     {appt.servicesSelected?.length > 0 && (
                       <div style={{ marginTop: 6 }}>
                         <div style={{ fontWeight: 600, marginBottom: 4 }}>Selected Services</div>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          {appt.servicesSelected.map((s, i) => <li key={i}>{s}</li>)}
-                        </ul>
+                        <ul style={{ margin: 0, paddingLeft: 18 }}>{appt.servicesSelected.map((s, i) => <li key={i}>{s}</li>)}</ul>
                       </div>
                     )}
                     {appt.servicesNotes && (
@@ -790,7 +919,7 @@ export default function App() {
         })}
       </div>
 
-      {/* Archived list (optional view) */}
+      {/* Archived list */}
       {showArchived && (
         <div style={card}>
           <h3 style={{ marginTop: 0 }}>🗂️ Archived Appointments</h3>
@@ -831,16 +960,10 @@ export default function App() {
 
       {/* Details modal */}
       {selected && (
-        <div
-          onClick={() => setSelected(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 1000 }}
-        >
+        <div onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 1000 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "white", width: "min(920px, 100%)", maxHeight: "80vh", overflow: "auto", borderRadius: 12 }}>
             <div style={{ padding: 12, borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <strong style={{ fontSize: 18 }}>{selected.clientName}</strong>
-                <span style={{ marginLeft: 8, color: "#6b7280" }}>{selected.date}</span>
-              </div>
+              <div><strong style={{ fontSize: 18 }}>{selected.clientName}</strong><span style={{ marginLeft: 8, color: "#6b7280" }}>{selected.date}</span></div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button style={buttonSecondary} onClick={printDetails}>Print</button>
                 <button style={buttonLight} onClick={() => setSelected(null)}>Close</button>
@@ -885,9 +1008,7 @@ export default function App() {
               {selected.servicesSelected?.length > 0 && (
                 <section style={{ marginBottom: 12 }}>
                   <div style={{ fontWeight: 700, marginBottom: 6 }}>Selected Services</div>
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {selected.servicesSelected.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>{selected.servicesSelected.map((s, i) => <li key={i}>{s}</li>)}</ul>
                 </section>
               )}
               {selected.servicesNotes && (
