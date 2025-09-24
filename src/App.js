@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 
 /* =========================
@@ -43,7 +42,6 @@ function sexColor(s) {
       return "#6b7280";
   }
 }
-
 /* =========================
    Main App
 ========================= */
@@ -98,8 +96,6 @@ export default function App() {
   const [collapsedDates, setCollapsedDates] = useState({});
   const [showArchived, setShowArchived] = useState(false);
   const [compactCards, setCompactCards] = useState(true);
-
-  // quick info card when clicking a date
   const [selectedDayInfo, setSelectedDayInfo] = useState("");
 
   /* ---------- Doctor/Worker assignment state ---------- */
@@ -143,7 +139,6 @@ export default function App() {
     localStorage.setItem("workers", JSON.stringify(workers));
     localStorage.setItem("staffByDate", JSON.stringify(staffByDate));
   }, [appointments, archivedAppointments, doctors, doctorByDate, workers, staffByDate]);
-
   /* =========================
      Helpers
   ========================= */
@@ -465,7 +460,6 @@ export default function App() {
       alert("❌ Restore failed. Check your internet or Netlify logs.");
     }
   }
-
   /* =========================
      Styles
   ========================= */
@@ -483,14 +477,14 @@ export default function App() {
   const chkItem = { display: "flex", alignItems: "center", gap: 8, background: "#f9fafb", padding: "8px 10px", borderRadius: 8, border: "1px solid #e5e7eb" };
   const listCard = {
     background: "white",
-    padding: compactCards ? 10 : 12,
+    padding: 10,
     borderRadius: 10,
-    marginBottom: compactCards ? 8 : 12,
+    marginBottom: 10,
     boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: compactCards ? 8 : 12,
+    gap: 10,
   };
   const tag = { display: "inline-flex", alignItems: "center", gap: 6, padding: "2px 8px", borderRadius: 999, background: "#eef2ff", color: "#3730a3", fontSize: 12, marginLeft: 8 };
   const dot = (bg) => ({ width: 8, height: 8, borderRadius: 999, background: bg, display: "inline-block" });
@@ -518,11 +512,12 @@ export default function App() {
     const dayAppts = apptsForDate(printModeDate);
     return (
       <div style={{ padding: 20 }}>
+        {/* Friendly header with Back + Print buttons */}
         <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0 }}>Client Appointments — {printModeDate}</h2>
           <div style={{ display: "flex", gap: 8 }}>
-            <button style={buttonPrimary} onClick={() => window.print()}>Print</button>
-            <button style={buttonSecondary} onClick={() => setPrintModeDate("")}>Back to Scheduler</button>
+            <button style={buttonSecondary} onClick={() => window.print()}>Print</button>
+            <button style={buttonLight} onClick={() => setPrintModeDate("")}>← Back to Scheduler</button>
           </div>
         </div>
         {dayAppts.length === 0 ? <div>No appointments for this date.</div> : dayAppts.map((a) => (
@@ -589,6 +584,20 @@ export default function App() {
             <input type="checkbox" checked={compactCards} onChange={(e)=>setCompactCards(e.target.checked)} style={{ marginRight: 6 }} />
             Compact cards
           </label>
+
+          {/* Print a day controls */}
+          <div style={{ display: "flex", alignItems: "end", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label style={{ color: "#374151", fontSize: 13, marginBottom: 4 }}>Print date</label>
+              <input
+                style={{ width: 180, padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "white", outline: "none" }}
+                type="date"
+                value={printDate}
+                onChange={(e) => setPrintDate(e.target.value)}
+              />
+            </div>
+            <button style={buttonLight} onClick={printDay}>Print this day</button>
+          </div>
         </div>
       </div>
 
@@ -601,7 +610,6 @@ export default function App() {
         </div>
         <div style={{ color: "#6b7280", fontSize: 13 }}>Archived count: <b>{archivedAppointments.length}</b></div>
       </div>
-
       {/* Doctors Settings */}
       <div style={card}>
         <button
@@ -673,7 +681,7 @@ export default function App() {
               <input style={input} type="date" value={staffDate} onChange={(e) => setStaffDate(e.target.value)} />
               <select style={input} value={selectedWorkerId} onChange={(e) => setSelectedWorkerId(e.target.value)}>
                 <option value="">Choose worker…</option>
-                {workers.map((w) => (<option key={w} value={slug(w)}>{w}</option>))}
+                {workers.map((w) => (<option key={w} value={w.toLowerCase().replace(/[^a-z0-9]+/g, "-")}>{w}</option>))}
               </select>
               <button style={buttonLight} onClick={assignWorkerToDate}>Add to day</button>
             </div>
@@ -698,9 +706,20 @@ export default function App() {
       {/* Day Overview (click a date) */}
       {selectedDayInfo && (
         <div style={{ ...card, borderLeft: "4px solid #2563eb" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <h3 style={{ margin: 0 }}>Day overview — {selectedDayInfo}</h3>
-            <button style={buttonLight} onClick={() => setSelectedDayInfo("")}>Close</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                style={buttonSecondary}
+                onClick={() => {
+                  setPrintModeDate(selectedDayInfo);
+                  setPrintDate(selectedDayInfo);
+                }}
+              >
+                Print this day
+              </button>
+              <button style={buttonLight} onClick={() => setSelectedDayInfo("")}>Close</button>
+            </div>
           </div>
           <div style={{ marginTop: 8, color: "#374151" }}>
             <div>
@@ -757,9 +776,7 @@ export default function App() {
             return (
               <div key={idx} style={cellStyle} title={ymd}
                 onClick={() => {
-                  // show overview card
                   setSelectedDayInfo(ymd);
-                  // jump to the list for that day and expand it
                   const el = document.getElementById(`day-${ymd}`);
                   if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); }
                   setCollapsedDates((prev)=>({ ...prev, [ymd]: false }));
@@ -835,9 +852,19 @@ export default function App() {
         <div style={{ marginTop: 16 }}>
           <label style={{ ...label, display: "block" }}>Common Services</label>
           <div style={chkWrap}>
-            {COMMON_SERVICES.map((svc) => (
+            {[
+              "Revolution",
+              "Ear Tip",
+              "Snap Test",
+              "Pain Meds To Go 1x",
+              "Pain Meds To Go 2x",
+              "Pain Meds To Go 3x",
+              "Microchip",
+              "E-Collar",
+              "Proof Of Vax",
+            ].map((svc) => (
               <label key={svc} style={chkItem}>
-                <input type="checkbox" checked={selectedServices.has(svc)} onChange={() => toggleService(svc)} />
+                <input type="checkbox" checked={selectedServices.has(svc)} onChange={() => setSelectedServices((prev)=>{const n=new Set(prev); n.has(svc)?n.delete(svc):n.add(svc); return n;})} />
                 <span>{svc}</span>
               </label>
             ))}
@@ -889,7 +916,7 @@ export default function App() {
                       <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
                         {appt.cats.map((c, i) => (
                           <span key={i} style={{ ...tag, background: "#f3f4f6", color: "#374151" }}>
-                            <i style={dot(sexColor(normSex(c.sex)))} /> {(c.name || "Cat")} — {normSex(c.sex) || "Unknown"}
+                            <i style={{ width: 8, height: 8, borderRadius: 999, background: sexColor(normSex(c.sex)), display: "inline-block" }} /> {(c.name || "Cat")} — {normSex(c.sex) || "Unknown"}
                           </span>
                         ))}
                       </div>
@@ -965,7 +992,7 @@ export default function App() {
             <div style={{ padding: 12, borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div><strong style={{ fontSize: 18 }}>{selected.clientName}</strong><span style={{ marginLeft: 8, color: "#6b7280" }}>{selected.date}</span></div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button style={buttonSecondary} onClick={printDetails}>Print</button>
+                <button style={buttonSecondary} onClick={() => window.print()}>Print</button>
                 <button style={buttonLight} onClick={() => setSelected(null)}>Close</button>
               </div>
             </div>
@@ -996,7 +1023,7 @@ export default function App() {
                           <td style={{ padding: 8, borderTop: "1px solid #e5e7eb" }}>{c.breed || "-"}</td>
                           <td style={{ padding: 8, borderTop: "1px solid #e5e7eb" }}>
                             <span style={{ ...tag, background: "#f3f4f6", color: "#374151" }}>
-                              <i style={{ ...dot(sexColor(normSex(c.sex))) }} /> {normSex(c.sex) || "-"}
+                              <i style={{ width: 8, height: 8, borderRadius: 999, background: sexColor(normSex(c.sex)), display: "inline-block" }} /> {normSex(c.sex) || "-"}
                             </span>
                           </td>
                         </tr>
